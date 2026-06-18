@@ -54,7 +54,7 @@ jobs:
           cmake -S . -B cmbuild -DCMAKE_BUILD_TYPE=Release -DABSEIL_INCLUDE_DIR="$ABSEIL_DIR"
           cmake --build cmbuild --config Release
           mkdir -p out
-          cp cmbuild/libwebrtc_aec.so out/
+          cp cmbuild/libwebrtc_aec.so "out/webrtc_aec-${{ matrix.name }}.so"
 
       # ── Windows: MSVC + meson + build webrtc-audio-processing + wrapper ──────
       - name: Windows toolchain
@@ -85,7 +85,7 @@ jobs:
           cmake -S . -B cmbuild -DABSEIL_INCLUDE_DIR=%ABSEIL_DIR% || exit /b 1
           cmake --build cmbuild --config Release || exit /b 1
           mkdir out
-          copy cmbuild\Release\webrtc_aec.dll out\ || copy cmbuild\webrtc_aec.dll out\
+          copy cmbuild\Release\webrtc_aec.dll out\webrtc_aec-windows-x64.dll || copy cmbuild\webrtc_aec.dll out\webrtc_aec-windows-x64.dll
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
