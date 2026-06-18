@@ -1,0 +1,90 @@
+name: build-webrtc-aec
+
+# Builds the webrtc_aec shared library (AEC3) for every platform MAYA runs on:
+#   - Windows x64   (the dev PC)
+#   - Linux x86_64  (x86 Linux / WSL)
+#   - Linux aarch64 (the Pi 5 / Jetson robot)
+# Download the artifacts from the Actions run and drop them into python/lib/.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  WEBRTC_TAG: "v1.3"   # webrtc-audio-processing version that contains AEC3
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux-x86_64,  os: ubuntu-24.04 }
+          - { name: linux-aarch64, os: ubuntu-24.04-arm }
+          - { name: windows-x64,   os: windows-2022 }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Linux: toolchain + build webrtc-audio-processing (meson) + wrapper ──
+      - name: Linux build
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y meson ninja-build pkg-config cmake git g++
+          PREFIX="$PWD/webrtc-install"
+
+          git clone --depth 1 --branch "$WEBRTC_TAG" \
+            https://gitlab.freedesktop.org/pulseaudio/webrtc-audio-processing.git wap
+          cd wap
+          meson setup build --prefix="$PREFIX" --buildtype=release \
+            --default-library=static -Db_pie=true
+          meson compile -C build
+          meson install -C build
+          cd ..
+
+          export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/lib/x86_64-linux-gnu/pkgconfig:$PREFIX/lib/aarch64-linux-gnu/pkgconfig"
+          cmake -S . -B cmbuild -DCMAKE_BUILD_TYPE=Release
+          cmake --build cmbuild --config Release
+          mkdir -p out
+          cp cmbuild/libwebrtc_aec.so out/
+
+      # ── Windows: MSVC + meson + build webrtc-audio-processing + wrapper ──────
+      - name: Windows toolchain
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Windows meson/pkgconfig
+        if: runner.os == 'Windows'
+        run: |
+          choco install -y pkgconfiglite ninja
+          python -m pip install --upgrade meson
+
+      - name: Windows build
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          set PREFIX=%CD%\webrtc-install
+          git clone --depth 1 --branch %WEBRTC_TAG% https://gitlab.freedesktop.org/pulseaudio/webrtc-audio-processing.git wap || exit /b 1
+          cd wap
+          meson setup build --prefix=%PREFIX% --buildtype=release --default-library=static || exit /b 1
+          meson compile -C build || exit /b 1
+          meson install -C build || exit /b 1
+          cd ..
+          set PKG_CONFIG_PATH=%PREFIX%\lib\pkgconfig
+          cmake -S . -B cmbuild -DCMAKE_BUILD_TYPE=Release || exit /b 1
+          cmake --build cmbuild --config Release || exit /b 1
+          mkdir out
+          copy cmbuild\Release\webrtc_aec.dll out\ || copy cmbuild\webrtc_aec.dll out\
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: webrtc_aec-${{ matrix.name }}
+          path: out/*
+          if-no-files-found: error

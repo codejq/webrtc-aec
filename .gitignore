@@ -1,0 +1,15 @@
+# build output
+out/
+cmbuild/
+build/
+webrtc-install/
+wap/
+
+# downloaded binaries (place them here locally; not committed)
+python/lib/*.dll
+python/lib/*.so
+
+# python
+__pycache__/
+*.pyc
+.venv/
