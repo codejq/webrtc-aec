@@ -11,6 +11,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write   # needed to publish the binaries to a GitHub Release
+
 env:
   WEBRTC_TAG: "v1.3"   # webrtc-audio-processing version that contains AEC3
 
@@ -93,3 +96,22 @@ jobs:
           name: webrtc_aec-${{ matrix.name }}
           path: out/*
           if-no-files-found: error
+
+  # Publish all three binaries to a single, always-current "latest" Release so
+  # they can be downloaded straight from the repo's Releases page.
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish to Releases (tag: latest)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "webrtc_aec binaries (latest)"
+          body: "WebRTC AEC3 shared libraries for Windows x64, Linux x86_64, and Linux aarch64. Drop into webrtc-aec/python/lib/."
+          files: dist/**
