@@ -49,7 +49,9 @@ jobs:
           cd ..
 
           export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:$PREFIX/lib/x86_64-linux-gnu/pkgconfig:$PREFIX/lib/aarch64-linux-gnu/pkgconfig"
-          cmake -S . -B cmbuild -DCMAKE_BUILD_TYPE=Release
+          ABSEIL_DIR=$(find "$PWD/wap/subprojects" -maxdepth 1 -type d -iname 'abseil*' | head -1)
+          echo "abseil headers: $ABSEIL_DIR"
+          cmake -S . -B cmbuild -DCMAKE_BUILD_TYPE=Release -DABSEIL_INCLUDE_DIR="$ABSEIL_DIR"
           cmake --build cmbuild --config Release
           mkdir -p out
           cp cmbuild/libwebrtc_aec.so out/
@@ -77,7 +79,10 @@ jobs:
           meson install -C build || exit /b 1
           cd ..
           set PKG_CONFIG_PATH=%PREFIX%\lib\pkgconfig
-          cmake -S . -B cmbuild -DCMAKE_BUILD_TYPE=Release || exit /b 1
+          set ABSEIL_DIR=
+          for /d %%D in (wap\subprojects\abseil*) do set ABSEIL_DIR=%%~fD
+          echo abseil headers: %ABSEIL_DIR%
+          cmake -S . -B cmbuild -DABSEIL_INCLUDE_DIR=%ABSEIL_DIR% || exit /b 1
           cmake --build cmbuild --config Release || exit /b 1
           mkdir out
           copy cmbuild\Release\webrtc_aec.dll out\ || copy cmbuild\webrtc_aec.dll out\
